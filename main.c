@@ -9,12 +9,15 @@ typedef struct Aero Aero;
 
 struct Vol
 {
+    // Destination
     Aero* destination;
+    // Dates départ
     int annee_depart;
     int mois_depart;
     int jour_depart;
     int heure_depart;
     int minute_depart;
+    // Dates arrivée
     int annee_arrivee;
     int mois_arrivee;
     int jour_arrivee;
@@ -36,7 +39,12 @@ struct Aero
 // TRADUCTION JSON
 // Recuperation des aeroports
 Aero* initialiser_aeroports() {
-    Aero* liste_aeroports;
+    Aero* liste_aeroports = malloc(sizeof(Aero));
+
+    Aero* aeroport_courant = malloc(sizeof(*aeroport_courant));
+
+
+
     return liste_aeroports;
 }
 
@@ -59,18 +67,20 @@ int main(int argc, char const *argv[])
 
 
     // TESTS
-    Aero* aeroport1 = malloc(sizeof(*aeroport1));
+    Aero* aeroport1 = malloc(sizeof(Aero));
     strcpy(aeroport1->nom_aeroport, "Charles de Gaulle");
 
-    Aero* aeroport2 = malloc(sizeof(*aeroport2));
+    Aero* aeroport2 = malloc(sizeof(Aero));
     strcpy(aeroport2->nom_aeroport, "Bordeaux");
 
-    Vol* vol1 = malloc(sizeof(*vol1));
+    Vol* vol1 = malloc(sizeof(Vol));
     vol1->destination = aeroport2;
     vol1->annee_depart = 2020;
     vol1->mois_depart = 10;
     vol1->jour_depart = 12;
     vol1->heure_depart = 15;
+
+    printf("%d\n", vol1->annee_depart);
     
     
     return 0;
