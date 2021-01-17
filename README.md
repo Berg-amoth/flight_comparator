@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# flight_comparator
-=======
 # flight comparator
 
 This is a C development project using graph theory tools to create flight comparator simulation software.
