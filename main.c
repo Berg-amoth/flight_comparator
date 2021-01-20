@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include </usr/local/lib/include/json-c/json.h>
 
-// STRUCTURES
+// STRUCTURES DE DONNÉES
 typedef struct Vol Vol;
 typedef struct Aero Aero;
 
@@ -39,6 +40,22 @@ struct Aero
 // TRADUCTION JSON
 // Recuperation des aeroports
 Aero* initialiser_aeroports() {
+    FILE *aeroport;
+	char buffer[1024];
+    struct json_object *name;
+	struct json_object *city;
+	struct json_object *countryName;
+	struct json_object *utcOffsetHours;
+	struct json_object *parsed_json;
+
+    aeroport = fopen("Avions_Bdd/AllAirports.json","r");
+    fread(buffer, 1024, 1, aeroport);
+    json_object_object_get_ex(buffer, "name", &name);
+    printf("Name: %s\n", json_object_get_string(name));
+
+
+
+
     Aero* liste_aeroports = malloc(sizeof(Aero));
 
     Aero* aeroport_courant = malloc(sizeof(*aeroport_courant));
