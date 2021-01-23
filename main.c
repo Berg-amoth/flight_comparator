@@ -113,12 +113,11 @@ void inserer_aeroport(Liste_villes* liste_villes, char nom_ville[50], char code_
     
 }
 
-
 Liste_villes* lister_aeroports() {
     FILE* fichier_aeroports = fopen("Avions_Bdd/allAirports.json", "r");
     if (fichier_aeroports == NULL) {
         printf("Erreur de lecture du fichier\n");
-        return 0;
+        exit(0);
     }
 
     // Initialisation des variables :
@@ -382,6 +381,456 @@ Liste_villes* lister_aeroports() {
     return liste_villes;
 }
 
+// Un nouveau vol est détecté par "arrivalAirportFsCode"
+void recenser_vols(Liste_villes* liste_villes) {
+    FILE* fichier_vols = fopen("Avions_Bdd/20160206_flightstatus.json", "r");
+    if (fichier_vols == NULL) {
+        printf("Erreur de lecture du fichier\n");
+        exit(0);
+    }
+    fseek(fichier_vols, 13, SEEK_SET);
+    
+    // Initialisation des variables
+        // de parcours
+        char caractere_courant = fgetc(fichier_vols);
+        // de reconnaissance des données
+        int validation_code_fs_arrivee = 0; // arrivalAirportFsCode":"AMS
+        int validation_date_arrivee = 0; // Utc":"2016-02-06T06:30:00.000Z
+        int validation_code_fs_depart = 0; // departureAirportFsCode":"AAL
+        int validation_date_depart = 0; // Utc":"2016-02-06T05:05:00.000Z
+        int arrivee_ou_depart = 0; // 0 : arrivée / 1 : départ
+
+        // d'enregistrement temporaire (le temps de la lecture) des données d'un aéroport
+        char code_fs_arrivee[6];
+        char date_arrivee[25];
+        char code_fs_depart[6];
+        char date_depart[25];
+
+        int nb_vols = 0;
+    
+    while (caractere_courant != EOF) {
+        // FS ARRIVEE
+        if (validation_code_fs_arrivee == 25) { // Si fin de lecture
+            code_fs_arrivee[2] = caractere_courant;
+
+            // TODO: enregistrer le vol
+            validation_code_fs_arrivee = 0;
+        }
+        else if (validation_code_fs_arrivee == 24) {
+            code_fs_arrivee[1] = caractere_courant;
+            validation_code_fs_arrivee++;
+        }
+        else if (validation_code_fs_arrivee == 23) {
+            code_fs_arrivee[0] = caractere_courant;
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == '"' && validation_code_fs_arrivee == 22) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == ':' && validation_code_fs_arrivee == 21) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == '"' && validation_code_fs_arrivee == 20) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'e' && validation_code_fs_arrivee == 19) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'd' && validation_code_fs_arrivee == 18) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'o' && validation_code_fs_arrivee == 17) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'C' && validation_code_fs_arrivee == 16) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 's' && validation_code_fs_arrivee == 15) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'F' && validation_code_fs_arrivee == 14) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 't' && validation_code_fs_arrivee == 13) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'r' && validation_code_fs_arrivee == 12) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'o' && validation_code_fs_arrivee == 11) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'p' && validation_code_fs_arrivee == 10) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'r' && validation_code_fs_arrivee == 9) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'i' && validation_code_fs_arrivee == 8) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'A' && validation_code_fs_arrivee == 7) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'l' && validation_code_fs_arrivee == 6) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'a' && validation_code_fs_arrivee == 5) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'v' && validation_code_fs_arrivee == 4) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'i' && validation_code_fs_arrivee == 3) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'r' && validation_code_fs_arrivee == 2) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'r' && validation_code_fs_arrivee == 1) {
+            validation_code_fs_arrivee++;
+        }
+        else if (caractere_courant == 'a' && validation_code_fs_arrivee == 0) {
+            validation_code_fs_arrivee++;
+        }
+        else if (validation_code_fs_arrivee > 0) { // Le début de la chaine correspond mais le caractère actuel non 
+            validation_code_fs_arrivee = 0;
+        }
+        
+        // DATE arrivee (UTC)
+        if (arrivee_ou_depart == 0) {
+            if (validation_date_arrivee == 28) { // Si fin de lecture
+                date_arrivee[22] = caractere_courant;
+                arrivee_ou_depart = 1;
+                validation_date_arrivee = 0;
+            }
+            else if (validation_date_arrivee == 27) {
+                date_arrivee[21] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 26) {
+                date_arrivee[20] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 25) {
+                date_arrivee[19] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 24) {
+                date_arrivee[18] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 23) {
+                date_arrivee[17] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 22) {
+                date_arrivee[16] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 21) {
+                date_arrivee[15] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 20) {
+                date_arrivee[14] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 19) {
+                date_arrivee[13] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 18) {
+                date_arrivee[12] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 17) {
+                date_arrivee[11] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 16) {
+                date_arrivee[10] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 15) {
+                date_arrivee[9] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 14) {
+                date_arrivee[8] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 13) {
+                date_arrivee[7] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 12) {
+                date_arrivee[6] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 11) {
+                date_arrivee[5] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 10) {
+                date_arrivee[4] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 9) {
+                date_arrivee[3] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 8) {
+                date_arrivee[2] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 7) {
+                date_arrivee[1] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee == 6) {
+                date_arrivee[0] = caractere_courant;
+                validation_date_arrivee++;
+            }
+            else if (caractere_courant == '"' && validation_date_arrivee == 5) {
+                validation_date_arrivee++;
+            }
+            else if (caractere_courant == ':' && validation_date_arrivee == 4) {
+                validation_date_arrivee++;
+            }
+            else if (caractere_courant == '"' && validation_date_arrivee == 3) {
+                validation_date_arrivee++;
+            }
+            else if (caractere_courant == 'c' && validation_date_arrivee == 2) {
+                validation_date_arrivee++;
+            }
+            else if (caractere_courant == 't' && validation_date_arrivee == 1) {
+                validation_date_arrivee++;
+            }
+            else if (caractere_courant == 'U' && validation_date_arrivee == 0) {
+                validation_date_arrivee++;
+            }
+            else if (validation_date_arrivee > 0) { // Le début de la chaine correspond mais le caractère actuel non 
+                validation_date_arrivee = 0;
+            }
+        }
+        
+
+        // FS DEPART        
+        if (validation_code_fs_depart == 27) { // Si fin de lecture
+            code_fs_depart[2] = caractere_courant;
+            validation_code_fs_depart = 0;
+        }
+        else if (validation_code_fs_depart == 26) {
+            code_fs_depart[1] = caractere_courant;
+            validation_code_fs_depart++;
+        }
+        else if (validation_code_fs_depart == 25) {
+            code_fs_depart[0] = caractere_courant;
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == '"' && validation_code_fs_depart == 24) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == ':' && validation_code_fs_depart == 23) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == '"' && validation_code_fs_depart == 22) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'e' && validation_code_fs_depart == 21) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'd' && validation_code_fs_depart == 20) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'o' && validation_code_fs_depart == 19) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'C' && validation_code_fs_depart == 18) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 's' && validation_code_fs_depart == 17) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'F' && validation_code_fs_depart == 16) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 't' && validation_code_fs_depart == 15) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'r' && validation_code_fs_depart == 14) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'o' && validation_code_fs_depart == 13) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'p' && validation_code_fs_depart == 12) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'r' && validation_code_fs_depart == 11) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'i' && validation_code_fs_depart == 10) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'A' && validation_code_fs_depart == 9) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'e' && validation_code_fs_depart == 8) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'r' && validation_code_fs_depart == 7) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'u' && validation_code_fs_depart == 6) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 't' && validation_code_fs_depart == 5) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'r' && validation_code_fs_depart == 4) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'a' && validation_code_fs_depart == 3) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'p' && validation_code_fs_depart == 2) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'e' && validation_code_fs_depart == 1) {
+            validation_code_fs_depart++;
+        }
+        else if (caractere_courant == 'd' && validation_code_fs_depart == 0) {
+            validation_code_fs_depart++;
+        }
+        else if (validation_code_fs_depart > 0) { // Le début de la chaine correspond mais le caractère actuel non 
+            validation_code_fs_depart = 0;
+        }
+
+        // DATE DEPART
+        if (arrivee_ou_depart == 1) {
+            if (validation_date_depart == 28) { // Si fin de lecture
+                date_depart[22] = caractere_courant;
+                arrivee_ou_depart = 0;
+                validation_date_depart = 0;
+            }
+            else if (validation_date_depart == 27) {
+                date_depart[21] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 26) {
+                date_depart[20] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 25) {
+                date_depart[19] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 24) {
+                date_depart[18] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 23) {
+                date_depart[17] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 22) {
+                date_depart[16] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 21) {
+                date_depart[15] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 20) {
+                date_depart[14] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 19) {
+                date_depart[13] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 18) {
+                date_depart[12] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 17) {
+                date_depart[11] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 16) {
+                date_depart[10] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 15) {
+                date_depart[9] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 14) {
+                date_depart[8] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 13) {
+                date_depart[7] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 12) {
+                date_depart[6] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 11) {
+                date_depart[5] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 10) {
+                date_depart[4] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 9) {
+                date_depart[3] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 8) {
+                date_depart[2] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 7) {
+                date_depart[1] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (validation_date_depart == 6) {
+                date_depart[0] = caractere_courant;
+                validation_date_depart++;
+            }
+            else if (caractere_courant == '"' && validation_date_depart == 5) {
+                validation_date_depart++;
+            }
+            else if (caractere_courant == ':' && validation_date_depart == 4) {
+                validation_date_depart++;
+            }
+            else if (caractere_courant == '"' && validation_date_depart == 3) {
+                validation_date_depart++;
+            }
+            else if (caractere_courant == 'c' && validation_date_depart == 2) {
+                validation_date_depart++;
+            }
+            else if (caractere_courant == 't' && validation_date_depart == 1) {
+                validation_date_depart++;
+            }
+            else if (caractere_courant == 'U' && validation_date_depart == 0) {
+                validation_date_depart++;
+            }
+            else if (validation_date_depart > 0) { // Le début de la chaine correspond mais le caractère actuel non 
+                validation_date_depart = 0;
+            }
+        }
+
+        caractere_courant = fgetc(fichier_vols);
+    }
+
+    fclose(fichier_vols);
+}
 
 void afficher_liste(Liste_villes liste) {
     int nb_aeroports = 0;
@@ -408,7 +857,8 @@ int main(int argc, char const *argv[])
     Liste_villes* liste_villes = lister_aeroports();
 
     clock_t start = clock();
-    afficher_liste(*liste_villes);
+    // afficher_liste(*liste_villes);
+    recenser_vols(liste_villes);
     clock_t end = clock() - start;
     printf("%ld ms\n", (end*1000/CLOCKS_PER_SEC));
 
