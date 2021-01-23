@@ -1,15 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <time.h>
-#include </usr/local/lib/include/json-c/json.h>
 
 // STRUCTURES DE DONNÉES
 typedef struct Vol Vol;
-typedef struct Aero Aero;
+typedef struct Liste_vols Liste_vols;
 
-struct Vol
-{
+typedef struct Aero Aero;
+typedef struct Liste_aeros Liste_aeros;
+
+typedef struct Ville Ville;
+typedef struct Liste_villes Liste_villes;
+
+struct Vol {
     // Destination
     Aero* destination;
     // Dates départ
@@ -24,81 +29,392 @@ struct Vol
     int jour_arrivee;
     int heure_arrivee;
     int minute_arrivee;
+    // Suivant
+    Vol* vol_suivant;
+};
+struct Liste_vols {
+    Vol* tete_vols;
 };
 
-struct Aero
-{
+struct Aero {
+    // Est
     char nom_aeroport[50];
-    char code[10];
-    char ville[50];
-    char pays[50];
-    int decalage_utc;
-    Vol* liste_vols;
+    char code_fs[5];
+    char decalage_utc[10];
+    // Vient de
+    Ville* ville;
+    // Contient
+    Liste_vols* liste_vols;
+    // Suivant
+    Aero* aero_suivant;
+};
+struct Liste_aeros {
+    Aero* tete_aeros;
 };
 
+struct Ville {
+    // Est
+    char nom_ville[50];
+    // Vient de
+    char nom_pays[50];
+    // Contient
+    Liste_aeros* liste_aeroports;
+    // Suivante
+    Ville* ville_suivante;
+};
+struct Liste_villes {
+    Ville* tete_villes;
+};
 
-// TRADUCTION JSON
-// Recuperation des aeroports
-Aero* initialiser_aeroports() {
-    FILE *aeroport;
-	char buffer[1024];
-    struct json_object *name;
-	struct json_object *city;
-	struct json_object *countryName;
-	struct json_object *utcOffsetHours;
-	struct json_object *parsed_json;
+// Parcours l'arborescence, si la ville n'existe pas, la crée, puis crée l'aéroport
+void inserer_aeroport(Liste_villes* liste_villes, char nom_ville[50], char code_fs[5], char nom_aeroport[50], char nom_pays[50], char decalage_utc[10]) {
+    // Création de l'aéroport
+    Aero* aeroport = malloc(sizeof(Aero));
+    strcpy(aeroport->code_fs, code_fs);
+    strcpy(aeroport->decalage_utc, decalage_utc);
+    aeroport->liste_vols = malloc(sizeof(Liste_vols));
+    aeroport->liste_vols->tete_vols = NULL;
+    if (strcmp(nom_aeroport, "") == 0) {
+        strcpy(aeroport->nom_aeroport, nom_ville);
+        strcat(aeroport->nom_aeroport, code_fs);
+    } else {
+        strcpy(aeroport->nom_aeroport, nom_aeroport);
+    }
 
-    aeroport = fopen("Avions_Bdd/AllAirports.json","r");
-    fread(buffer, 1024, 1, aeroport);
-    json_object_object_get_ex(buffer, "name", &name);
-    printf("Name: %s\n", json_object_get_string(name));
+    // Ajout à la liste des aéroports de la ville
+    Ville* curseur_ville = liste_villes->tete_villes;
+    int cette_ville_existe = 0;
+    Ville* ville;
+    while (curseur_ville != NULL && cette_ville_existe == 0) {
+        // LA VILLE EXISTE
+        if (strcmp(curseur_ville->nom_ville, nom_ville) == 0) {
+            cette_ville_existe = 1;
+            ville = curseur_ville;
+        }
+        curseur_ville = curseur_ville->ville_suivante;
+    }
+    if (cette_ville_existe == 0) {
+        ville = malloc(sizeof(Ville));
+        strcpy(ville->nom_pays, nom_pays);
+        strcpy(ville->nom_ville, nom_ville);
+        ville->ville_suivante = liste_villes->tete_villes;
+        liste_villes->tete_villes = ville;
+    }
+    if (ville->liste_aeroports == NULL) {
+        Liste_aeros* liste_aeroports_de_la_ville = malloc(sizeof(Liste_aeros));
+        liste_aeroports_de_la_ville->tete_aeros = NULL;
+        ville->liste_aeroports = liste_aeroports_de_la_ville;
+    }
+    aeroport->aero_suivant = ville->liste_aeroports->tete_aeros;
+    ville->liste_aeroports->tete_aeros = aeroport;
 
-
-
-
-    Aero* liste_aeroports = malloc(sizeof(Aero));
-
-    Aero* aeroport_courant = malloc(sizeof(*aeroport_courant));
-
-
-
-    return liste_aeroports;
+    // On ajoute la ville à l'aéroport
+    aeroport->ville = ville;
+    
 }
 
 
-// VÉRIFICATION DATES
+Liste_villes* lister_aeroports() {
+    FILE* fichier_aeroports = fopen("Avions_Bdd/allAirports.json", "r");
+    if (fichier_aeroports == NULL) {
+        printf("Erreur de lecture du fichier\n");
+        return 0;
+    }
+
+    // Initialisation des variables :
+        // de la ville
+        Liste_villes* liste_villes = malloc(sizeof(Liste_villes));
+
+        // de parcours
+        char caractere_courant = fgetc(fichier_aeroports);
+
+        // de reconnaissance des données
+        int validation_nom_ville = 0; // city":"Cali"
+        int compteur_nom_ville = 0;
+        int validation_code_fs = 0; // fs":"CLO
+        int validation_nom_aeroport = 0; // name":"Mukhaizna Airport"
+        int compteur_nom_aeroport = 0;
+        int validation_nom_pays = 0; // countryName":"Oman"
+        int compteur_nom_pays = 0;
+        int validation_decalage_utc = 0; // utcOffsetHours":-6.0,
+        int compteur_utc = 0; // Permet de savoir à quelle position écrire la valeur du décalage utc dans le tableau correspondant
+
+        // d'enregistrement temporaire (le temps de la lecture) des données d'un aéroport
+        char nom_ville[50];
+        char code_fs[6];
+        char nom_aeroport[50];
+        char nom_pays[50];
+        char decalage_utc[10];
+
+    // Parcours tout le fichier
+    while (caractere_courant != ']' && caractere_courant != EOF) {
+        // On enregistre les données d'un aeroport à chaque '}'
+        if (caractere_courant == '}') {
+            inserer_aeroport(liste_villes, nom_ville, code_fs, nom_aeroport, nom_pays, decalage_utc);
+            // printf("fs : %s : %ld\n", code_fs, sizeof(code_fs));
+        }
+
+        // NOM VILLE
+        if (validation_nom_ville > 6 && caractere_courant == '"') { // Si fin de lecture
+            nom_ville[compteur_nom_ville] = '\0';
+            compteur_nom_ville = 0;
+            validation_nom_ville = 0;
+        }
+        else if (validation_nom_ville > 6) {
+            nom_ville[compteur_nom_ville] = caractere_courant;
+            compteur_nom_ville++;
+        }
+        else if (caractere_courant == '"' && validation_nom_ville == 6) {
+            validation_nom_ville++;
+        }
+        else if (caractere_courant == ':' && validation_nom_ville == 5) {
+            validation_nom_ville++;
+        }
+        else if (caractere_courant == '"' && validation_nom_ville == 4) {
+            validation_nom_ville++;
+        }
+        else if (caractere_courant == 'y' && validation_nom_ville == 3) {
+            validation_nom_ville++;
+        }
+        else if (caractere_courant == 't' && validation_nom_ville == 2) {
+            validation_nom_ville++;
+        }
+        else if (caractere_courant == 'i' && validation_nom_ville == 1) {
+            validation_nom_ville++;
+        }
+        else if (caractere_courant == 'c' && validation_nom_ville == 0) {
+            validation_nom_ville++;
+        }
+        else if (validation_nom_ville > 0) { // Le début de la chaine correspond mais le caractère actuel non 
+            validation_nom_ville = 0;
+        }
+
+        // CODE FS (AEROPORT)
+        if (validation_code_fs == 7) { // Si fin de lecture
+            code_fs[2] = caractere_courant;
+            validation_code_fs = 0;
+        }
+        else if (validation_code_fs == 6) {
+            code_fs[1] = caractere_courant;
+            validation_code_fs++;
+        }
+        else if (validation_code_fs == 5) {
+            code_fs[0] = caractere_courant;
+            validation_code_fs++;
+        }
+        else if (caractere_courant == '"' && validation_code_fs == 4) {
+            validation_code_fs++;
+        }
+        else if (caractere_courant == ':' && validation_code_fs == 3) {
+            validation_code_fs++;
+        }
+        else if (caractere_courant == '"' && validation_code_fs == 2) {
+            validation_code_fs++;
+        }
+        else if (caractere_courant == 's' && validation_code_fs == 1) {
+            validation_code_fs++;
+        }
+        else if (caractere_courant == 'f' && validation_code_fs == 0) {
+            validation_code_fs++;
+        }
+        else if (validation_code_fs > 0) { // Le début de la chaine correspond mais le caractère actuel non 
+            validation_code_fs = 0;
+        }
+
+        // NOM AEROPORT
+        if (validation_nom_aeroport > 6 && caractere_courant == '"') { // Si fin de lecture
+            nom_aeroport[compteur_nom_aeroport] = '\0';
+            compteur_nom_aeroport = 0;
+            validation_nom_aeroport = 0;
+        }
+        else if (validation_nom_aeroport > 6) {
+            nom_aeroport[compteur_nom_aeroport] = caractere_courant;
+            compteur_nom_aeroport++;
+        }
+        else if (caractere_courant == '"' && validation_nom_aeroport == 6) {
+            validation_nom_aeroport++;
+        }
+        else if (caractere_courant == ':' && validation_nom_aeroport == 5) {
+            validation_nom_aeroport++;
+        }
+        else if (caractere_courant == '"' && validation_nom_aeroport == 4) {
+            validation_nom_aeroport++;
+        }
+        else if (caractere_courant == 'e' && validation_nom_aeroport == 3) {
+            validation_nom_aeroport++;
+        }
+        else if (caractere_courant == 'm' && validation_nom_aeroport == 2) {
+            validation_nom_aeroport++;
+        }
+        else if (caractere_courant == 'a' && validation_nom_aeroport == 1) {
+            validation_nom_aeroport++;
+        }
+        else if (caractere_courant == 'n' && validation_nom_aeroport == 0) {
+            validation_nom_aeroport++;
+        }
+        else if (validation_nom_aeroport > 0) { // Le début de la chaine correspond mais le caractère actuel non 
+            validation_nom_aeroport = 0;
+        }
+
+        // NOM PAYS
+        if (validation_nom_pays > 13 && caractere_courant == '"') { // Si fin de lecture
+            nom_pays[compteur_nom_pays] = '\0';
+            compteur_nom_pays = 0;
+            validation_nom_pays = 0;
+        }
+        else if (validation_nom_pays > 13) {
+            nom_pays[compteur_nom_pays] = caractere_courant;
+            compteur_nom_pays++;
+        }
+        else if (caractere_courant == '"' && validation_nom_pays == 13) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == ':' && validation_nom_pays == 12) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == '"' && validation_nom_pays == 11) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 'e' && validation_nom_pays == 10) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 'm' && validation_nom_pays == 9) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 'a' && validation_nom_pays == 8) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 'N' && validation_nom_pays == 7) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 'y' && validation_nom_pays == 6) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 'r' && validation_nom_pays == 5) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 't' && validation_nom_pays == 4) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 'n' && validation_nom_pays == 3) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 'u' && validation_nom_pays == 2) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 'o' && validation_nom_pays == 1) {
+            validation_nom_pays++;
+        }
+        else if (caractere_courant == 'c' && validation_nom_pays == 0) {
+            validation_nom_pays++;
+        }
+        else if (validation_nom_pays > 0) { // Le début de la chaine correspond mais le caractère actuel non 
+            validation_nom_pays = 0;
+        }
+
+        // DECALAGE UTC
+        if (validation_decalage_utc > 15 && caractere_courant == ',') { // Si fin de lecture
+            decalage_utc[compteur_utc] = '\0';
+            compteur_utc = 0;
+            validation_decalage_utc = 0;
+        }
+        else if (validation_decalage_utc > 15) {
+            decalage_utc[compteur_utc] = caractere_courant;
+            compteur_utc++;
+        }
+        else if (caractere_courant == ':' && validation_decalage_utc == 15) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == '"' && validation_decalage_utc == 14) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 's' && validation_decalage_utc == 13) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 'r' && validation_decalage_utc == 12) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 'u' && validation_decalage_utc == 11) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 'o' && validation_decalage_utc == 10) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 'H' && validation_decalage_utc == 9) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 't' && validation_decalage_utc == 8) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 'e' && validation_decalage_utc == 7) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 's' && validation_decalage_utc == 6) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 'f' && validation_decalage_utc == 5) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 'f' && validation_decalage_utc == 4) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 'O' && validation_decalage_utc == 3) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 'c' && validation_decalage_utc == 2) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 't' && validation_decalage_utc == 1) {
+            validation_decalage_utc++;
+        }
+        else if (caractere_courant == 'u' && validation_decalage_utc == 0) {
+            validation_decalage_utc++;
+        }
+        else if (validation_decalage_utc > 0) { // Le début de la chaine correspond mais le caractère actuel non 
+            validation_decalage_utc = 0;
+        }
+
+        // On récupère le prochain caractère
+        caractere_courant = fgetc(fichier_aeroports);
+    }
+
+    fclose(fichier_aeroports);
+    return liste_villes;
+}
 
 
-// DIJSKTRA
+void afficher_liste(Liste_villes liste) {
+    int nb_aeroports = 0;
+    int nb_villes = 0;
+    Ville* ville = liste.tete_villes;
+    while (ville != NULL)
+    {
+        Aero* aeroport = ville->liste_aeroports->tete_aeros;
+        while (aeroport != NULL) {
+            printf("%s   %s   %s\n", aeroport->code_fs, aeroport->nom_aeroport, aeroport->ville->nom_ville);
+            nb_aeroports++;
+            aeroport = aeroport->aero_suivant;
+        }
+        // printf("%s\n", ville->nom_ville);
+        ville = ville->ville_suivante;
+        nb_villes++;
+    }
+    printf("%d\n", nb_villes);
+}
 
 
-// MAIN
 int main(int argc, char const *argv[])
 {
-    // Liste des aeroports (uniquement ceux dont on connait les vols)
-    Aero* aeroports = initialiser_aeroports();
+    Liste_villes* liste_villes = lister_aeroports();
 
+    clock_t start = clock();
+    afficher_liste(*liste_villes);
+    clock_t end = clock() - start;
+    printf("%ld ms\n", (end*1000/CLOCKS_PER_SEC));
 
+    // char nombre[10] = "8.92\0";
+    // float nombree = atof(nombre);
+    // printf("char : %s -> int : %f\n", nombre, nombree);
 
-
-
-
-    // TESTS
-    Aero* aeroport1 = malloc(sizeof(Aero));
-    strcpy(aeroport1->nom_aeroport, "Charles de Gaulle");
-
-    Aero* aeroport2 = malloc(sizeof(Aero));
-    strcpy(aeroport2->nom_aeroport, "Bordeaux");
-
-    Vol* vol1 = malloc(sizeof(Vol));
-    vol1->destination = aeroport2;
-    vol1->annee_depart = 2020;
-    vol1->mois_depart = 10;
-    vol1->jour_depart = 12;
-    vol1->heure_depart = 15;
-
-    printf("%d\n", vol1->annee_depart);
-    
-    
     return 0;
 }
