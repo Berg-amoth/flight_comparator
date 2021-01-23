@@ -393,6 +393,7 @@ void recenser_vols(Liste_villes* liste_villes) {
     // Initialisation des variables
         // de parcours
         char caractere_courant = fgetc(fichier_vols);
+        int num_vol = 0;
         // de reconnaissance des données
         int validation_code_fs_arrivee = 0; // arrivalAirportFsCode":"AMS
         int validation_date_arrivee = 0; // Utc":"2016-02-06T06:30:00.000Z
@@ -405,8 +406,6 @@ void recenser_vols(Liste_villes* liste_villes) {
         char date_arrivee[25];
         char code_fs_depart[6];
         char date_depart[25];
-
-        int nb_vols = 0;
     
     while (caractere_courant != EOF) {
         // FS ARRIVEE
@@ -414,6 +413,7 @@ void recenser_vols(Liste_villes* liste_villes) {
             code_fs_arrivee[2] = caractere_courant;
 
             // TODO: enregistrer le vol
+            num_vol++;
             validation_code_fs_arrivee = 0;
         }
         else if (validation_code_fs_arrivee == 24) {
