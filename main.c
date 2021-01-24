@@ -3,6 +3,8 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 // STRUCTURES DE DONNÉES
 typedef struct Vol Vol;
@@ -13,6 +15,8 @@ typedef struct Liste_aeros Liste_aeros;
 
 typedef struct Ville Ville;
 typedef struct Liste_villes Liste_villes;
+
+typedef struct Noeud Noeud;
 
 struct Vol {
     // Destination
@@ -55,6 +59,7 @@ struct Liste_aeros {
 struct Ville {
     // Est
     char nom_ville[50];
+    int num_ville; // Pour le choix utilisateur
     // Vient de
     char nom_pays[50];
     // Contient
@@ -66,8 +71,15 @@ struct Liste_villes {
     Ville* tete_villes;
 };
 
+struct Noeud {
+    Noeud* noeud_precedent;
+    Aero* aeroport;
+    int etat;
+    long long date_arrivee; // 202012061925 -> 2020/12/06 à 19:25 -> YYYYMMDDHHmm
+};
+
 // Parcours l'arborescence, si la ville n'existe pas, la crée, puis crée l'aéroport
-void inserer_aeroport(Liste_villes* liste_villes, char nom_ville[50], char code_fs[5], char nom_aeroport[50], char nom_pays[50], char decalage_utc[10]) {
+void inserer_aeroport(Liste_villes* liste_villes, char nom_ville[50], int num_ville, char code_fs[5], char nom_aeroport[50], char nom_pays[50], char decalage_utc[10]) {
     // Création de l'aéroport
     Aero* aeroport = malloc(sizeof(Aero));
     strcpy(aeroport->code_fs, code_fs);
@@ -97,6 +109,7 @@ void inserer_aeroport(Liste_villes* liste_villes, char nom_ville[50], char code_
         ville = malloc(sizeof(Ville));
         strcpy(ville->nom_pays, nom_pays);
         strcpy(ville->nom_ville, nom_ville);
+        ville->num_ville = num_ville;
         ville->ville_suivante = liste_villes->tete_villes;
         liste_villes->tete_villes = ville;
     }
@@ -123,6 +136,7 @@ Liste_villes* lister_aeroports() {
     // Initialisation des variables :
         // de la ville
         Liste_villes* liste_villes = malloc(sizeof(Liste_villes));
+        int num_ville = 0;
 
         // de parcours
         char caractere_courant = fgetc(fichier_aeroports);
@@ -149,7 +163,7 @@ Liste_villes* lister_aeroports() {
     while (caractere_courant != ']' && caractere_courant != EOF) {
         // On enregistre les données d'un aeroport à chaque '}'
         if (caractere_courant == '}') {
-            inserer_aeroport(liste_villes, nom_ville, code_fs, nom_aeroport, nom_pays, decalage_utc);
+            inserer_aeroport(liste_villes, nom_ville, num_ville++, code_fs, nom_aeroport, nom_pays, decalage_utc);
             // printf("fs : %s : %ld\n", code_fs, sizeof(code_fs));
         }
 
@@ -523,7 +537,7 @@ void lister_vols(Liste_villes* liste_villes) {
                 inserer_vol(liste_villes, code_fs_arrivee, date_arrivee, code_fs_depart, date_depart);
             }
             num_vol++;
-            // printf("%3d/100 (%5d)\n", (int)(num_vol*100/60371), num_vol);
+            printf("%3d/100\r", (int)(num_vol*100/60371));
 
             // On passe à la suite
             validation_code_fs_arrivee = 0;
@@ -943,53 +957,263 @@ void lister_vols(Liste_villes* liste_villes) {
     // Insertion du dernier vol
     inserer_vol(liste_villes, code_fs_arrivee, date_arrivee, code_fs_depart, date_depart);
 
-    printf("%d\n", num_vol);
+    printf("100/100 | Chargement terminé !\n");
     fclose(fichier_vols);
 }
 
-void afficher_liste(Liste_villes liste) {
-    int nb_vols_sans_destination = 0;
-    int nb_vols = 0;
-    int nb_aeroports = 0;
-    int nb_villes = 0;
-    Ville* ville = liste.tete_villes;
+int afficher_villes_depart(Liste_villes liste_villes, char lettre) {
+    // Formatage de la lettre pour accepter les majuscules et les minuscules
+    if (lettre >= 'a' && lettre <= 'z') {
+        lettre += 'A' - 'a';
+    }
+    char premiere_lettre_ville;
+
+    // Recherche
+    int il_y_a_au_moins_une_ville = 0;
+    Ville* ville = liste_villes.tete_villes;
     while (ville != NULL) {
-        Aero* aeroport = ville->liste_aeroports->tete_aeros;
-        while (aeroport != NULL) {
-            Vol* vol = aeroport->liste_vols->tete_vols;
-            while (vol != NULL) {
-                if (vol->destination == NULL) {
-                    nb_vols_sans_destination++;
-                }
-                printf("%d:%d:%dT%d:%d -> %d:%d:%dT%d:%d \n", vol->annee_depart, vol->mois_depart, vol->jour_depart, vol->heure_depart, vol->minute_depart, vol->annee_arrivee, vol->mois_arrivee, vol->jour_arrivee, vol->heure_arrivee, vol->minute_arrivee);
-                nb_vols++;
-                vol = vol->vol_suivant;
-            }
-            // printf("%s\n", aeroport->code_fs);
-            nb_aeroports++;
-            aeroport = aeroport->aero_suivant;
+        premiere_lettre_ville = ville->nom_ville[0];
+        if (premiere_lettre_ville >= 'a' && premiere_lettre_ville <= 'z') {
+            premiere_lettre_ville += 'A' - 'a';
+        }
+        if (premiere_lettre_ville == lettre && ville->liste_aeroports->tete_aeros->liste_vols->tete_vols != NULL) {
+            printf("%5d : %s (%s)\n", ville->num_ville, ville->nom_ville, ville->nom_pays);
+            il_y_a_au_moins_une_ville = 1;
         }
         ville = ville->ville_suivante;
-        nb_villes++;
     }
-    printf("Vols : %d sans dest : %d\n", nb_vols, nb_vols_sans_destination);
+
+    return il_y_a_au_moins_une_ville;
 }
 
+int afficher_villes_arrivee(Liste_villes liste_villes, char lettre) {
+    // Formatage de la lettre pour accepter les majuscules et les minuscules
+    if (lettre >= 'a' && lettre <= 'z') {
+        lettre += 'A' - 'a';
+    }
+    char premiere_lettre_ville;
+
+    // Recherche des villes
+    int il_y_a_au_moins_une_ville = 0;
+    Ville* ville = liste_villes.tete_villes;
+    while (ville != NULL) {
+        premiere_lettre_ville = ville->nom_ville[0];
+        if (premiere_lettre_ville >= 'a' && premiere_lettre_ville <= 'z') {
+            premiere_lettre_ville += 'A' - 'a';
+        }
+        if (premiere_lettre_ville == lettre) {
+            printf("%5d : %s (%s)\n", ville->num_ville, ville->nom_ville, ville->nom_pays);
+            il_y_a_au_moins_une_ville = 1;
+        }
+        ville = ville->ville_suivante;
+    }
+
+    return il_y_a_au_moins_une_ville;
+}
+
+// Permet de retrouver une ville à partir de son numéro
+Ville* trouver_ville(Liste_villes liste_villes, int num_ville) {
+    Ville* ville = liste_villes.tete_villes;
+    while (ville != NULL && ville->num_ville != num_ville) {
+        ville = ville->ville_suivante;
+    }
+    return ville;
+}
+
+int compter_nombre_aeroports_ville(Ville ville) {
+    int nombre_aeroports = 0;
+    Aero* aero_curseur = ville.liste_aeroports->tete_aeros;
+    while (aero_curseur != NULL) {
+        nombre_aeroports++;
+        aero_curseur = aero_curseur->aero_suivant;
+    }
+    
+    return nombre_aeroports;
+}
+
+int compter_nombre_aeroports(Liste_villes liste_villes) {
+    int nombre_aeroports = 0;
+    Ville* ville_curseur = liste_villes.tete_villes;
+    Aero* aero_curseur;
+    while (ville_curseur != NULL) {
+        aero_curseur = ville_curseur->liste_aeroports->tete_aeros;
+        while (aero_curseur != NULL) {
+            nombre_aeroports++;
+            aero_curseur = aero_curseur->aero_suivant;
+        }
+        ville_curseur = ville_curseur->ville_suivante;
+    }
+
+    return nombre_aeroports;
+}
+
+Aero* trouver_aeroport(Ville ville, int index) {
+    Aero* aero_curseur = ville.liste_aeroports->tete_aeros;
+    for (int i = 0; i < index; i++) {
+        aero_curseur = aero_curseur->aero_suivant;
+    }
+    return aero_curseur;
+}
+
+int index_plus_petite_valeur(int* valeurs, int size) {
+    int index_min = 0;
+    int valeur_min = valeurs[0];
+    for (int i = 1; i < size; i++) {
+        if (valeurs[i] < valeur_min) {
+            valeur_min = valeurs[i];
+            index_min = i;
+        }
+    }
+
+    return index_min;
+}
+
+int plus_petite_valeur(int* valeurs, int size) {
+    int valeur_min = valeurs[0];
+    for (int i = 1; i < size; i++) {
+        if (valeurs[i] < valeur_min) {
+            valeur_min = valeurs[i];
+        }
+    }
+
+    return valeur_min;
+}
 
 int main(int argc, char const *argv[])
 {
+    printf("Chargement des données :\n");
+    // Chargement des données
     Liste_villes* liste_villes = lister_aeroports();
-
-    clock_t start = clock();
-    // afficher_liste(*liste_villes);
     lister_vols(liste_villes);
-    clock_t end = clock() - start;
-    afficher_liste(*liste_villes);
-    printf("%ld ms\n", (end*1000/CLOCKS_PER_SEC));
 
-    // char nombre[10] = "8.92\0";
-    // float nombree = atof(nombre);
-    // printf("char : %s -> int : %f\n", nombre, nombree);
+    // Interaction utilisateur
+    int calculer_vol = 0;
+    int choix_utilisateur = -1;
+    int num_ville_depart;
+    int num_ville_arrivee;
+    char lettre_ville_depart;
+    char lettre_ville_arrivee;
+    while (choix_utilisateur != 0) {
+        if (choix_utilisateur == -1) {
+            printf("Veuillez entrer la première lettre de la ville de départ : ");
+            scanf(" %c", &lettre_ville_depart);
+            printf("--------------------------------\n");
+            if (afficher_villes_depart(*liste_villes, lettre_ville_depart) == 0) {
+                printf("Il n'y a pas de vol prévu d'une ville commançant par la lettre : %c\n", lettre_ville_depart);
+            }
+            printf("--------------------------------\n");
+            printf("   -1 : relancer une recherche\n");
+            printf("    0 : quitter\n");
+            printf("Veuillez indiquer votre choix : ");
+            scanf("%d", &choix_utilisateur);
+        } if (choix_utilisateur > 0) {
+            // On enregistre le numéro de la ville de départ
+            num_ville_depart = choix_utilisateur;
+            // Interaction utilisateur
+            printf("Veuillez entrer la première lettre de la ville de destination : ");
+            scanf(" %c", &lettre_ville_arrivee);
+            printf("--------------------------------\n");
+            if (afficher_villes_arrivee(*liste_villes, lettre_ville_arrivee) == 0) {
+                printf("Il n'y a pas de vol prévu vers une ville commançant par la lettre : %c\n", lettre_ville_arrivee);
+            }
+            printf("--------------------------------\n");
+            printf("   -2 : relancer une recherche de destination\n");
+            printf("   -1 : relancer une recherche complète\n");
+            printf("    0 : quitter\n");
+            printf("Veuillez indiquer votre choix : ");
+            scanf("%d", &choix_utilisateur);
+            if (choix_utilisateur > 0) {
+                num_ville_arrivee = choix_utilisateur;
+                calculer_vol = 1;
+            }
+        } if (calculer_vol == 1) {
+            // Initialisation des données nécessaires à Dijkstra
+            int nombre_aeroports = compter_nombre_aeroports(*liste_villes);
+            Noeud* noeuds = (Noeud*)malloc(nombre_aeroports*sizeof(Noeud));
+            int numero_aeroport = 0;
+            Ville* ville_curseur = liste_villes->tete_villes;
+            Aero* aero_curseur;
+            while (ville_curseur != NULL) {
+                aero_curseur = ville_curseur->liste_aeroports->tete_aeros;
+                while (aero_curseur != NULL) {
+                    noeuds[numero_aeroport].noeud_precedent = NULL;
+                    noeuds[numero_aeroport].aeroport = aero_curseur;
+                    noeuds[numero_aeroport].etat = 0;
+                    noeuds[numero_aeroport].date_arrivee = 0;
+                    numero_aeroport++;
+                    aero_curseur = aero_curseur->aero_suivant;
+                }
+                ville_curseur = ville_curseur->ville_suivante;
+            }
+            Noeud* noeud_actuel = malloc(sizeof(Noeud));
+            
+            // Enregistre les villes de départ et d'arrivée
+            Ville* ville_depart = trouver_ville(*liste_villes, num_ville_depart);
+            Ville* ville_arrivee = trouver_ville(*liste_villes, num_ville_arrivee);
+
+            // Trouver le nombre d'aéroports de départ : x
+            int nombre_aeroport_depart = compter_nombre_aeroports_ville(*ville_depart);
+
+            // Trouver le nombre d'aéroports d'arrivée : y
+            int nombre_aeroport_arrivee = compter_nombre_aeroports_ville(*ville_arrivee);
+
+            // Fork x fois
+            __pid_t* pids_depart = malloc(nombre_aeroport_depart*sizeof(__pid_t));
+            __pid_t pid_pere = getpid();
+            Aero* aero_depart;
+            int* dates_arrivee_chemin_x = malloc(nombre_aeroport_depart*sizeof(int));
+            int date_arrivee_chemin_x;
+            for (int i = 0; i < nombre_aeroport_depart; i++) {
+                if (getpid() == pid_pere) {
+                    pids_depart[i] = fork();
+                    aero_depart = trouver_aeroport(*ville_depart, i);
+                }
+            }
+            if (getpid() == pid_pere) { // Si père
+                for (int i = 0; i < nombre_aeroport_depart; i++) {
+                    waitpid(pids_depart[i], &date_arrivee_chemin_x, 0); // RECEPTION 2/2 - Plus court chemin par aéroport de départ
+                    dates_arrivee_chemin_x[i] = WEXITSTATUS(date_arrivee_chemin_x);
+                    // printf("RECEPTION 2/2 : %d -> %d\n", i, dates_arrivee_chemin_x[i]);
+                }
+                printf("Il vaut mieux partir de l'aéroport : %s\n", trouver_aeroport(*ville_depart, index_plus_petite_valeur(dates_arrivee_chemin_x, nombre_aeroport_depart))->nom_aeroport);
+            } else { // Chaque fils
+//------------------------------------------------------------------------------------------------------
+                __pid_t* pids_arrivee = malloc(nombre_aeroport_arrivee*sizeof(__pid_t));
+                __pid_t pid_pere = getpid();
+                Aero* aero_arrivee;
+                int* dates_arrivee_chemin_y = malloc(nombre_aeroport_arrivee*sizeof(int));
+                int date_arrivee_chemin_y;
+                for (int i = 0; i < nombre_aeroport_arrivee; i++) {
+                    if (getpid() == pid_pere) {
+                        pids_arrivee[i] = fork();
+                        aero_arrivee = trouver_aeroport(*ville_arrivee, i);
+                    }
+                }
+                if (getpid() == pid_pere) { // Si père
+                    for (int i = 0; i < nombre_aeroport_arrivee; i++) {
+                        waitpid(pids_arrivee[i], &date_arrivee_chemin_y, 0); // RECEPTION 1/2 - Meilleur chemin pour chaque aéroport d'arrivée depuis l'aéroport actuel
+                        dates_arrivee_chemin_y[i] = WEXITSTATUS(date_arrivee_chemin_y);
+                        // printf("RECEPTION 1/2 : %d -> %d\n", i, dates_arrivee_chemin_y[i]);
+                    }
+                    // printf("Meilleur aéroport d'arrivée : %s\n", trouver_aeroport(*ville_arrivee, index_plus_petite_valeur(dates_arrivee_chemin_y, nombre_aeroport_arrivee))->nom_aeroport);
+                    exit(plus_petite_valeur(dates_arrivee_chemin_y, nombre_aeroport_arrivee)); // RETOUR : 2/2 - Le chemin le plus court parmis ceux partant de cet aéroport
+                } else { // chaque fils -> Dijkstra s'effectue ici
+
+                    exit(); // RETOUR : 1/2 - Plus courte date de chaque chemin arrivant à cet aéroport
+                }
+//------------------------------------------------------------------------------------------------------
+            }
+        }
+        
+        
+    }
 
     return 0;
 }
+
+
+
+
+// char nombre[10] = "8.92\0";
+    // float nombree = atof(nombre);
+    // printf("char : %s -> int : %f\n", nombre, nombree);
