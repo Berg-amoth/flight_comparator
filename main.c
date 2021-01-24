@@ -381,8 +381,58 @@ Liste_villes* lister_aeroports() {
     return liste_villes;
 }
 
+///////////////////////////////////////////////////////// PROBLEM HERE HERE HERE
+void inserer_vol(Liste_villes* liste_villes, char code_fs_arrivee[6], char date_arrivee[25], char code_fs_depart[6], char date_depart[25]) {
+    int dnb_dest = 0;
+    int dnb_src = 0;
+
+    // Création du vol
+    Vol* vol = malloc(sizeof(Vol));
+    Aero* aeroport_depart;
+    Aero* aeroport_arrivee;
+
+    // Création des curseurs
+    Ville* ville_curseur = liste_villes->tete_villes;
+    Aero* aeroport_curseur = ville_curseur->liste_aeroports->tete_aeros;
+
+    // Parcours de la liste à la recherche de l'aéroport de départ pour l'y insérer et celui d'arrivée pour insérer l'aéroport en destination du vol
+    while (ville_curseur != NULL) {
+        // Le curseur se place au début de la liste des aéroports de la ville actuelle
+        aeroport_curseur = ville_curseur->liste_aeroports->tete_aeros;
+        // Parcours de tous les aéroports
+        while (aeroport_curseur != NULL) {
+            // Si le code FS de l'aéroport actuel correspond à celui de l'aéroport d'arrivée du vol on l'enregistre
+            if ((code_fs_arrivee[0] == aeroport_curseur->code_fs[0]) && (code_fs_arrivee[1] == aeroport_curseur->code_fs[1]) && (code_fs_arrivee[2] == aeroport_curseur->code_fs[2])) {
+                if (dnb_dest < 1) {
+                    aeroport_arrivee = aeroport_curseur;
+                }
+                dnb_dest++;
+            }
+            // Si le code FS de l'aéroport actuel correspond à celui de l'aéroport de dépard du vol on rajoute ce vol à la liste des vols de l'aéroport actuel
+            if ((code_fs_depart[0] == aeroport_curseur->code_fs[0]) && (code_fs_depart[1] == aeroport_curseur->code_fs[1]) && (code_fs_depart[2] == aeroport_curseur->code_fs[2])) {
+                if (dnb_src < 1) {
+                    aeroport_depart = aeroport_curseur;
+                    // vol->vol_suivant = aeroport_curseur->liste_vols->tete_vols;
+                    // aeroport_curseur->liste_vols->tete_vols = vol;
+                }
+                dnb_src++;
+            }
+            // Aéroport suivant
+            aeroport_curseur = aeroport_curseur->aero_suivant;
+        }
+        // Ville suivante
+        ville_curseur = ville_curseur->ville_suivante;
+    }
+
+    if (dnb_dest == 1 && dnb_src == 1) {
+        vol->destination = aeroport_arrivee;
+        vol->vol_suivant = aeroport_depart->liste_vols->tete_vols;
+        aeroport_depart->liste_vols->tete_vols = vol;
+    }
+}
+
 // Un nouveau vol est détecté par "arrivalAirportFsCode"
-void recenser_vols(Liste_villes* liste_villes) {
+void lister_vols(Liste_villes* liste_villes) {
     FILE* fichier_vols = fopen("Avions_Bdd/20160206_flightstatus.json", "r");
     if (fichier_vols == NULL) {
         printf("Erreur de lecture du fichier\n");
@@ -412,8 +462,14 @@ void recenser_vols(Liste_villes* liste_villes) {
         if (validation_code_fs_arrivee == 25) { // Si fin de lecture
             code_fs_arrivee[2] = caractere_courant;
 
-            // TODO: enregistrer le vol
+            // Insertion du vol dans l'aéroport
+            if (num_vol > 0) {
+                inserer_vol(liste_villes, code_fs_arrivee, date_arrivee, code_fs_depart, date_depart);
+            }
             num_vol++;
+            // printf("%3d/100 (%5d)\n", (int)(num_vol*100/60371), num_vol);
+
+            // On passe à la suite
             validation_code_fs_arrivee = 0;
         }
         else if (validation_code_fs_arrivee == 24) {
@@ -828,27 +884,39 @@ void recenser_vols(Liste_villes* liste_villes) {
 
         caractere_courant = fgetc(fichier_vols);
     }
+    // Insertion du dernier vol
+    inserer_vol(liste_villes, code_fs_arrivee, date_arrivee, code_fs_depart, date_depart);
 
+    printf("%d\n", num_vol);
     fclose(fichier_vols);
 }
 
 void afficher_liste(Liste_villes liste) {
+    int nb_vols_sans_destination = 0;
+    int nb_vols = 0;
     int nb_aeroports = 0;
     int nb_villes = 0;
     Ville* ville = liste.tete_villes;
-    while (ville != NULL)
-    {
+    while (ville != NULL) {
         Aero* aeroport = ville->liste_aeroports->tete_aeros;
         while (aeroport != NULL) {
-            printf("%s   %s   %s\n", aeroport->code_fs, aeroport->nom_aeroport, aeroport->ville->nom_ville);
+            Vol* vol = aeroport->liste_vols->tete_vols;
+            while (vol != NULL) {
+                if (vol->destination == NULL) {
+                    nb_vols_sans_destination++;
+                }
+                printf("%s -> %s\n", aeroport->code_fs, vol->destination->code_fs);
+                nb_vols++;
+                vol = vol->vol_suivant;
+            }
+            // printf("%s\n", aeroport->code_fs);
             nb_aeroports++;
             aeroport = aeroport->aero_suivant;
         }
-        // printf("%s\n", ville->nom_ville);
         ville = ville->ville_suivante;
         nb_villes++;
     }
-    printf("%d\n", nb_villes);
+    printf("Vols : %d sans dest : %d\n", nb_vols, nb_vols_sans_destination);
 }
 
 
@@ -858,8 +926,9 @@ int main(int argc, char const *argv[])
 
     clock_t start = clock();
     // afficher_liste(*liste_villes);
-    recenser_vols(liste_villes);
+    lister_vols(liste_villes);
     clock_t end = clock() - start;
+    afficher_liste(*liste_villes);
     printf("%ld ms\n", (end*1000/CLOCKS_PER_SEC));
 
     // char nombre[10] = "8.92\0";
