@@ -391,6 +391,64 @@ void inserer_vol(Liste_villes* liste_villes, char code_fs_arrivee[6], char date_
     Aero* aeroport_depart;
     Aero* aeroport_arrivee;
 
+    // Ajout des valeurs d'arrivée au vol
+        // Année
+        char annee_arrivee[5];
+        for (int i = 0; i < 4; i++) {
+            annee_arrivee[i] = date_arrivee[i];
+        }
+        vol->annee_arrivee = atoi(annee_arrivee);
+        // Mois
+        char mois_arrivee[3];
+        mois_arrivee[0] = date_arrivee[5];
+        mois_arrivee[1] = date_arrivee[6];
+        vol->mois_arrivee = atoi(mois_arrivee);
+        // Jour
+        char jour_arrivee[3];
+        jour_arrivee[0] = date_arrivee[8];
+        jour_arrivee[1] = date_arrivee[9];
+        vol->jour_arrivee = atoi(jour_arrivee);
+        // Heure
+        char heure_arrivee[3];
+        heure_arrivee[0] = date_arrivee[11];
+        heure_arrivee[1] = date_arrivee[12];
+        vol->heure_arrivee = atoi(heure_arrivee);
+        // Minute
+        char minute_arrivee[3];
+        minute_arrivee[0] = date_arrivee[14];
+        minute_arrivee[1] = date_arrivee[15];
+        vol->minute_arrivee = atoi(minute_arrivee);
+
+    // Ajout des valeurs de départ au vol
+        // Année
+        char annee_depart[5];
+        for (int i = 0; i < 4; i++) {
+            annee_depart[i] = date_depart[i];
+        }
+        vol->annee_depart = atoi(annee_depart);
+        // Mois
+        char mois_depart[3];
+        mois_depart[0] = date_depart[5];
+        mois_depart[1] = date_depart[6];
+        vol->mois_depart = atoi(mois_depart);
+        // Jour
+        char jour_depart[3];
+        jour_depart[0] = date_depart[8];
+        jour_depart[1] = date_depart[9];
+        vol->jour_depart = atoi(jour_depart);
+        // Heure
+        char heure_depart[3];
+        heure_depart[0] = date_depart[11];
+        heure_depart[1] = date_depart[12];
+        vol->heure_depart = atoi(heure_depart);
+        // Minute
+        char minute_depart[3];
+        minute_depart[0] = date_depart[14];
+        minute_depart[1] = date_depart[15];
+        vol->minute_depart = atoi(minute_depart);
+
+
+
     // Création des curseurs
     Ville* ville_curseur = liste_villes->tete_villes;
     Aero* aeroport_curseur = ville_curseur->liste_aeroports->tete_aeros;
@@ -412,8 +470,6 @@ void inserer_vol(Liste_villes* liste_villes, char code_fs_arrivee[6], char date_
             if ((code_fs_depart[0] == aeroport_curseur->code_fs[0]) && (code_fs_depart[1] == aeroport_curseur->code_fs[1]) && (code_fs_depart[2] == aeroport_curseur->code_fs[2])) {
                 if (dnb_src < 1) {
                     aeroport_depart = aeroport_curseur;
-                    // vol->vol_suivant = aeroport_curseur->liste_vols->tete_vols;
-                    // aeroport_curseur->liste_vols->tete_vols = vol;
                 }
                 dnb_src++;
             }
@@ -905,7 +961,7 @@ void afficher_liste(Liste_villes liste) {
                 if (vol->destination == NULL) {
                     nb_vols_sans_destination++;
                 }
-                printf("%s -> %s\n", aeroport->code_fs, vol->destination->code_fs);
+                printf("%d:%d:%dT%d:%d -> %d:%d:%dT%d:%d \n", vol->annee_depart, vol->mois_depart, vol->jour_depart, vol->heure_depart, vol->minute_depart, vol->annee_arrivee, vol->mois_arrivee, vol->jour_arrivee, vol->heure_arrivee, vol->minute_arrivee);
                 nb_vols++;
                 vol = vol->vol_suivant;
             }
