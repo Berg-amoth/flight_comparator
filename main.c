@@ -1004,22 +1004,39 @@ int afficher_villes_depart(Liste_villes liste_villes, char lettre) {
     return il_y_a_au_moins_une_ville;
 }
 
-int afficher_villes_arrivee(Liste_villes liste_villes, char lettre) {
+int afficher_villes_arrivee(Liste_villes liste_villes, char lettres[10]) {
     // Formatage de la lettre pour accepter les majuscules et les minuscules
-    if (lettre >= 'a' && lettre <= 'z') {
-        lettre += 'A' - 'a';
+    if (lettres[0] >= 'a' && lettres[0] <= 'z') {
+        lettres[0] += 'A' - 'a';
     }
-    char premiere_lettre_ville;
+    if (lettres[1] >= 'a' && lettres[1] <= 'z') {
+        lettres[1] += 'A' - 'a';
+    }
+    if (lettres[2] >= 'a' && lettres[2] <= 'z') {
+        lettres[2] += 'A' - 'a';
+    }
+    lettres[3] = '\0';
+    char premiere_lettre_ville[10];
 
     // Recherche des villes
     int il_y_a_au_moins_une_ville = 0;
     Ville* ville = liste_villes.tete_villes;
     while (ville != NULL) {
-        premiere_lettre_ville = ville->nom_ville[0];
-        if (premiere_lettre_ville >= 'a' && premiere_lettre_ville <= 'z') {
-            premiere_lettre_ville += 'A' - 'a';
+        premiere_lettre_ville[0] = ville->nom_ville[0];
+        if (premiere_lettre_ville[0] >= 'a' && premiere_lettre_ville[0] <= 'z') {
+            premiere_lettre_ville[0] += 'A' - 'a';
         }
-        if (premiere_lettre_ville == lettre) {
+        premiere_lettre_ville[1] = ville->nom_ville[1];
+        if (premiere_lettre_ville[1] >= 'a' && premiere_lettre_ville[1] <= 'z') {
+            premiere_lettre_ville[1] += 'A' - 'a';
+        }
+        premiere_lettre_ville[2] = ville->nom_ville[2];
+        if (premiere_lettre_ville[2] >= 'a' && premiere_lettre_ville[2] <= 'z') {
+            premiere_lettre_ville[2] += 'A' - 'a';
+        }
+        premiere_lettre_ville[3] = '\0';
+        
+        if (strcmp(premiere_lettre_ville, lettres) == 0) {
             printf("%5d : %s (%s)\n", ville->num_ville, ville->nom_ville, ville->nom_pays);
             il_y_a_au_moins_une_ville = 1;
         }
@@ -1097,7 +1114,8 @@ int plus_petite_valeur(int* valeurs, int size) {
     return valeur_min;
 }
 
-int dijkstra(Liste_villes* liste_villes, char aeroport_depart_fs[10], char aeroport_arrivee_fs[10], int afficher_chemin) {
+int dijkstra(Liste_villes* liste_villes, char aeroport_depart_fs[10], char aeroport_arrivee_fs[10], int nb_escales_max, int afficher_chemin) {
+    // INITIALISATION
     int nb_escales = 0;
     // Initialisation du noeud d'arrivée
     Noeud* destination;
@@ -1134,16 +1152,15 @@ int dijkstra(Liste_villes* liste_villes, char aeroport_depart_fs[10], char aerop
         }
         ville_curseur = ville_curseur->ville_suivante;
     }
-
     
-    // Algorithme
+    // ALGORITHME
     int fin_algo = 0;
     Vol* vol_curseur;
     while (fin_algo == 0) {
         nb_escales++;
         // On vérifie si on a trouvé le chemin le plus court
         for (int i = 0; i < nombre_aeroports; i++) {
-            if (nb_escales > 20 || (noeuds[i].etat == 1 && noeuds[i].date_arrivee >= destination->date_arrivee)) {
+            if (nb_escales >= nb_escales_max || (noeuds[i].etat == 1 && noeuds[i].date_arrivee >= destination->date_arrivee)) {
                 fin_algo = 1;
             }
         }
@@ -1152,7 +1169,7 @@ int dijkstra(Liste_villes* liste_villes, char aeroport_depart_fs[10], char aerop
         while (vol_curseur != NULL) { // Parcours tous les vols du noeud
             if (noeud_actuel->date_arrivee < vol_curseur->date_depart) { // Si le vol part après notre arrivée dans l'aéroport actuel
                 for (int i = 0; i < nombre_aeroports; i++) {
-                    if (vol_curseur->destination->code_fs[0] == noeuds[i].aeroport->code_fs[0] && vol_curseur->destination->code_fs[1] == noeuds[i].aeroport->code_fs[1] && vol_curseur->destination->code_fs[2] == noeuds[i].aeroport->code_fs[2] && vol_curseur->destination->code_fs[3] == noeuds[i].aeroport->code_fs[3] && noeuds[i].etat < 2) {
+                    if (strcmp(vol_curseur->destination->code_fs, noeuds[i].aeroport->code_fs) == 0 && noeuds[i].etat < 2) {
                         if (noeuds[i].etat == 0) {
                             noeuds[i].etat = 1;
                             noeuds[i].date_arrivee = vol_curseur->date_arrivee;
@@ -1180,12 +1197,13 @@ int dijkstra(Liste_villes* liste_villes, char aeroport_depart_fs[10], char aerop
         noeud_actuel->etat = 2;
     }
 
-    if (destination->date_arrivee < 22222) {
-        printf("Departure : %s | Arrival : %s | Date : %d | Nb it : %d\n", aeroport_depart_fs, aeroport_arrivee_fs, destination->date_arrivee, nb_escales);
-    }
+    // if (destination->date_arrivee < 22222) {
+    //     printf("Departure : %s | Arrival : %s | Date : %d | Nb it : %d\n", aeroport_depart_fs, aeroport_arrivee_fs, destination->date_arrivee, nb_escales);
+    // }
 
     // Affichage du chemin
     if (afficher_chemin) {
+        printf("--------------------------------\n");
         printf("Arrivée ");
         Noeud* noeud_curseur = destination;
         while (noeud_curseur != NULL) {
@@ -1195,6 +1213,7 @@ int dijkstra(Liste_villes* liste_villes, char aeroport_depart_fs[10], char aerop
         printf("<- départ\n");
     }
 
+    // RETOUR
     return destination->date_arrivee;
 }
 
@@ -1207,6 +1226,7 @@ int main(int argc, char const *argv[])
     // Chargement des données
     Liste_villes* liste_villes = lister_aeroports();
     lister_vols(liste_villes);
+    int nb_escales_max;
 
     // Interaction utilisateur
     int calculer_vol = 0;
@@ -1214,7 +1234,7 @@ int main(int argc, char const *argv[])
     int num_ville_depart;
     int num_ville_arrivee;
     char lettre_ville_depart;
-    char lettre_ville_arrivee;
+    char lettres_ville_arrivee[10];
     while (choix_utilisateur != 0) {
         if (choix_utilisateur == -1) {
             printf("Veuillez entrer la première lettre de la ville de départ : ");
@@ -1232,11 +1252,12 @@ int main(int argc, char const *argv[])
             // On enregistre le numéro de la ville de départ
             num_ville_depart = choix_utilisateur;
             // Interaction utilisateur
-            printf("Veuillez entrer la première lettre de la ville de destination : ");
-            scanf(" %c", &lettre_ville_arrivee);
+            printf("Veuillez entrer les trois premières lettres de la ville de destination : ");
+            scanf("%s", lettres_ville_arrivee);
+            lettres_ville_arrivee[3] = '\0';
             printf("--------------------------------\n");
-            if (afficher_villes_arrivee(*liste_villes, lettre_ville_arrivee) == 0) {
-                printf("Il n'y a pas de vol prévu vers une ville commançant par la lettre : %c\n", lettre_ville_arrivee);
+            if (afficher_villes_arrivee(*liste_villes, lettres_ville_arrivee) == 0) {
+                printf("Il n'y a pas de vol prévu vers une ville commançant par les lettres : %s\n", lettres_ville_arrivee);
             }
             printf("--------------------------------\n");
             printf("   -2 : relancer une recherche de destination\n");
@@ -1246,6 +1267,13 @@ int main(int argc, char const *argv[])
             scanf("%d", &choix_utilisateur);
             if (choix_utilisateur > 0) {
                 num_ville_arrivee = choix_utilisateur;
+                // Interaction utilisateur
+                printf("Nombre d'escales maximum : ");
+                scanf("%d", &nb_escales_max);
+                if (nb_escales_max > 10) {
+                    nb_escales_max = 10;
+                }
+                
                 calculer_vol = 1;
             }
         } if (calculer_vol == 1) { // Afin de gagner en efficacité, plusieurs processus calculerons le meilleur aéroport de départ et d'arrivée (car plusieurs aéroports par ville) à l'aide de l'algorithme de Dijkstra
@@ -1282,7 +1310,7 @@ int main(int argc, char const *argv[])
                 }
                 // On connait désormais le meilleur aéroport de départ
                 meilleur_aeroport_depart = trouver_aeroport(*ville_depart, index_plus_petite_valeur(dates_arrivee_chemin_x, nombre_aeroports_depart));
-                printf("Il vaut mieux partir de l'aéroport : %s\n", trouver_aeroport(*ville_depart, index_plus_petite_valeur(dates_arrivee_chemin_x, nombre_aeroports_depart))->nom_aeroport);
+                // printf("Il vaut mieux partir de l'aéroport : %s\n", trouver_aeroport(*ville_depart, index_plus_petite_valeur(dates_arrivee_chemin_x, nombre_aeroports_depart))->nom_aeroport);
                 // Recherche du meilleur aéroport d'arrivée
                 //------------------------------------------------------------------------------------------------------
                 __pid_t* pids_arrivee = malloc(nombre_aeroports_arrivee*sizeof(__pid_t));
@@ -1302,17 +1330,25 @@ int main(int argc, char const *argv[])
                         dates_arrivee_chemin[i] = WEXITSTATUS(date_arrivee_chemin);
                     }
                     meilleur_aeroport_arrivee = trouver_aeroport(*ville_arrivee, index_plus_petite_valeur(dates_arrivee_chemin, nombre_aeroports_arrivee));
-                    printf("Il vaut mieux arriver à l'aéroport : %s\n", meilleur_aeroport_arrivee->nom_aeroport);
+                    // printf("Il vaut mieux arriver à l'aéroport : %s\n", meilleur_aeroport_arrivee->nom_aeroport);
 
                     // TODO : Dijkstra final pour connaitre le meilleur itinéraire
-                    printf("FINAL : %d\n", dijkstra(liste_villes, meilleur_aeroport_depart->code_fs, meilleur_aeroport_arrivee->code_fs, 1));
+                    int date_finale_arrivee = dijkstra(liste_villes, meilleur_aeroport_depart->code_fs, meilleur_aeroport_arrivee->code_fs, nb_escales_max, 1);
+                    if (date_finale_arrivee == 22222) {
+                        printf("Nous sommes navrés de vous apprendre qu'il n'existe pas de vol direct ou de correspondances vers cette destination actuellement.\n");
+                    } else {
+                        char date_affichee[12];
+                        sprintf(date_affichee, "%d", date_finale_arrivee);
+                        printf("En prenant cet itinéraire, vous arriverez le 0%c/02/2016 à %c%ch%c0.\n", date_affichee[0], date_affichee[1], date_affichee[2], date_affichee[3]);
+                        printf("--------------------------------\n");
+                    }
 
                     // FIN DU PROGRAMME////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                     printf("Merci d'avoir utilisé nos services, à bientôt !\n");
                     choix_utilisateur = 0;
                     // FIN DU PROGRAMME////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                 } else { // chaque fils -> Dijkstra s'effectue ici
-                    exit((int)(dijkstra(liste_villes, meilleur_aeroport_depart->code_fs, aero_arrivee->code_fs, 0)/255)); // RETOUR B : 1/2 - Plus courte date de chaque chemin arrivant à cet aéroport
+                    exit((int)(dijkstra(liste_villes, meilleur_aeroport_depart->code_fs, aero_arrivee->code_fs, nb_escales_max, 0)/255)); // RETOUR B : 1/2 - Plus courte date de chaque chemin arrivant à cet aéroport
                 }
                 //------------------------------------------------------------------------------------------------------
             } else { // Chaque fils cherche ici le meilleur aéroport de départ en comparant leurs meilleurs chemins jusqu'à la ville de destination (en essayant chaque aéroport d'arrivée)
@@ -1335,7 +1371,7 @@ int main(int argc, char const *argv[])
                     }
                     exit(plus_petite_valeur(dates_arrivee_chemin_y, nombre_aeroports_arrivee)); // RETOUR A : 2/2 - Le chemin le plus court parmis ceux partant de cet aéroport
                 } else { // chaque fils -> Dijkstra s'effectue ici
-                    exit((int)(dijkstra(liste_villes, aero_depart->code_fs, aero_arrivee->code_fs, 0)/255)); // RETOUR A : 1/2 - Plus courte date de chaque chemin arrivant à cet aéroport
+                    exit((int)(dijkstra(liste_villes, aero_depart->code_fs, aero_arrivee->code_fs, nb_escales_max, 0)/255)); // RETOUR A : 1/2 - Plus courte date de chaque chemin arrivant à cet aéroport
                 }
             //------------------------------------------------------------------------------------------------------
             }
