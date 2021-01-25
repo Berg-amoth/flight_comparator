@@ -21,18 +21,9 @@ typedef struct Noeud Noeud;
 struct Vol {
     // Destination
     Aero* destination;
-    // Dates départ
-    int annee_depart;
-    int mois_depart;
-    int jour_depart;
-    int heure_depart;
-    int minute_depart;
-    // Dates arrivée
-    int annee_arrivee;
-    int mois_arrivee;
-    int jour_arrivee;
-    int heure_arrivee;
-    int minute_arrivee;
+    // Dates
+    int date_depart;
+    int date_arrivee;
     // Suivant
     Vol* vol_suivant;
 };
@@ -75,9 +66,11 @@ struct Noeud {
     Noeud* noeud_precedent;
     Aero* aeroport;
     int etat;
-    long long date_arrivee; // 202012061925 -> 2020/12/06 à 19:25 -> YYYYMMDDHHmm
+    int date_arrivee; // 202012061925 -> 2020/12/06 à 19:25 -> DDHHmm
 };
 
+
+// FONCTIONS
 // Parcours l'arborescence, si la ville n'existe pas, la crée, puis crée l'aéroport
 void inserer_aeroport(Liste_villes* liste_villes, char nom_ville[50], int num_ville, char code_fs[5], char nom_aeroport[50], char nom_pays[50], char decalage_utc[10]) {
     // Création de l'aéroport
@@ -395,7 +388,6 @@ Liste_villes* lister_aeroports() {
     return liste_villes;
 }
 
-///////////////////////////////////////////////////////// PROBLEM HERE HERE HERE
 void inserer_vol(Liste_villes* liste_villes, char code_fs_arrivee[6], char date_arrivee[25], char code_fs_depart[6], char date_depart[25]) {
     int dnb_dest = 0;
     int dnb_src = 0;
@@ -411,27 +403,27 @@ void inserer_vol(Liste_villes* liste_villes, char code_fs_arrivee[6], char date_
         for (int i = 0; i < 4; i++) {
             annee_arrivee[i] = date_arrivee[i];
         }
-        vol->annee_arrivee = atoi(annee_arrivee);
+        vol->date_arrivee = atoi(annee_arrivee)*100000000;
         // Mois
         char mois_arrivee[3];
         mois_arrivee[0] = date_arrivee[5];
         mois_arrivee[1] = date_arrivee[6];
-        vol->mois_arrivee = atoi(mois_arrivee);
+        vol->date_arrivee += atoi(mois_arrivee)*1000000;
         // Jour
         char jour_arrivee[3];
         jour_arrivee[0] = date_arrivee[8];
         jour_arrivee[1] = date_arrivee[9];
-        vol->jour_arrivee = atoi(jour_arrivee);
+        vol->date_arrivee += atoi(jour_arrivee)*10000;
         // Heure
         char heure_arrivee[3];
         heure_arrivee[0] = date_arrivee[11];
         heure_arrivee[1] = date_arrivee[12];
-        vol->heure_arrivee = atoi(heure_arrivee);
+        vol->date_arrivee += atoi(heure_arrivee)*100;
         // Minute
         char minute_arrivee[3];
         minute_arrivee[0] = date_arrivee[14];
         minute_arrivee[1] = date_arrivee[15];
-        vol->minute_arrivee = atoi(minute_arrivee);
+        vol->date_arrivee += atoi(minute_arrivee);
 
     // Ajout des valeurs de départ au vol
         // Année
@@ -439,27 +431,27 @@ void inserer_vol(Liste_villes* liste_villes, char code_fs_arrivee[6], char date_
         for (int i = 0; i < 4; i++) {
             annee_depart[i] = date_depart[i];
         }
-        vol->annee_depart = atoi(annee_depart);
+        vol->date_depart = atoi(annee_depart)*100000000;
         // Mois
         char mois_depart[3];
         mois_depart[0] = date_depart[5];
         mois_depart[1] = date_depart[6];
-        vol->mois_depart = atoi(mois_depart);
+        vol->date_depart += atoi(mois_depart)*1000000;
         // Jour
         char jour_depart[3];
         jour_depart[0] = date_depart[8];
         jour_depart[1] = date_depart[9];
-        vol->jour_depart = atoi(jour_depart);
+        vol->date_depart += atoi(jour_depart)*10000;
         // Heure
         char heure_depart[3];
         heure_depart[0] = date_depart[11];
         heure_depart[1] = date_depart[12];
-        vol->heure_depart = atoi(heure_depart);
+        vol->date_depart += atoi(heure_depart)*100;
         // Minute
         char minute_depart[3];
         minute_depart[0] = date_depart[14];
         minute_depart[1] = date_depart[15];
-        vol->minute_depart = atoi(minute_depart);
+        vol->date_depart += atoi(minute_depart);
 
 
 
@@ -1079,8 +1071,93 @@ int plus_petite_valeur(int* valeurs, int size) {
     return valeur_min;
 }
 
+int dijkstra(Liste_villes* liste_villes, char aeroport_depart_fs[6], char aeroport_arrivee_fs[6]) {
+    // Initialisation du noeud d'arrivée
+    Noeud* destination;
+
+    // Initialisation du noeud de parcours à la valeur de départ
+    Noeud* noeud_actuel;
+
+    // Initialisation du tableau des noeuds
+    int nombre_aeroports = compter_nombre_aeroports(*liste_villes);
+    Noeud* noeuds = (Noeud*)malloc(nombre_aeroports*sizeof(Noeud));
+    int numero_aeroport = 0;
+    Ville* ville_curseur = liste_villes->tete_villes;
+    Aero* aero_curseur;
+    while (ville_curseur != NULL) {
+        aero_curseur = ville_curseur->liste_aeroports->tete_aeros;
+        while (aero_curseur != NULL) {
+            if (aero_curseur->code_fs[0] == aeroport_depart_fs[0] && aero_curseur->code_fs[1] == aeroport_depart_fs[1] && aero_curseur->code_fs[2] == aeroport_depart_fs[2]) {
+                noeuds[numero_aeroport].etat = 2;
+                noeuds[numero_aeroport].date_arrivee = 201602050000; // Pour simplifier, on suppose que nous sommes au plus tard le 05/02/2016 à 00:00
+                noeud_actuel = &noeuds[numero_aeroport];
+            } else if (aero_curseur->code_fs[0] == aeroport_arrivee_fs[0] && aero_curseur->code_fs[1] == aeroport_arrivee_fs[1] && aero_curseur->code_fs[2] == aeroport_arrivee_fs[2]) {
+                noeuds[numero_aeroport].etat = 0;
+                noeuds[numero_aeroport].date_arrivee = 0;
+                destination = &noeuds[numero_aeroport];
+            } else {
+                noeuds[numero_aeroport].etat = 0;
+                noeuds[numero_aeroport].date_arrivee = 0;
+            }
+            noeuds[numero_aeroport].noeud_precedent = NULL;
+            noeuds[numero_aeroport].aeroport = aero_curseur;
+            
+            numero_aeroport++;
+            aero_curseur = aero_curseur->aero_suivant;
+        }
+        ville_curseur = ville_curseur->ville_suivante;
+    }
+
+    // Algorithme
+    int fin_algo = 0;
+    Vol* vol_curseur;
+    while (fin_algo == 0) {
+        // On vérifie si on a trouvé le chemin le plus court
+        fin_algo = 1;
+        for (int i = 0; i < nombre_aeroports; i++) {
+            if (destination->etat == 1 && noeuds[i].etat == 1 && noeuds[i].date_arrivee < destination->date_arrivee) {
+                fin_algo = 0;
+            }
+        }
+        // Marque les aéroports accessibles depuis le noeud actuel
+        vol_curseur = noeud_actuel->aeroport->liste_vols->tete_vols;
+        while (vol_curseur != NULL) {
+            for (int i = 0; i < nombre_aeroports; i++) { // La première condition ci-dessous permet de vérifier que l'on ne se déplace d'aéroport en aéroport que par des vols qui se succèdent (sans se chevaucher)
+                if (noeud_actuel->date_arrivee < vol_curseur->date_depart && vol_curseur->destination->code_fs[0] == noeuds[i].aeroport->code_fs[0] && vol_curseur->destination->code_fs[1] == noeuds[i].aeroport->code_fs[1] && vol_curseur->destination->code_fs[2] == noeuds[i].aeroport->code_fs[2] && noeuds[i].etat < 2) {
+                    if (noeuds[i].etat == 0) {
+                        noeuds[i].etat = 1;
+                        noeuds[i].date_arrivee = vol_curseur->date_arrivee;
+                    } else if (vol_curseur->date_arrivee < noeuds[i].date_arrivee) {
+                        noeuds[i].date_arrivee = vol_curseur->date_arrivee;
+                    }
+                    noeuds[i].noeud_precedent = noeud_actuel;
+                }
+            }
+            vol_curseur = vol_curseur->vol_suivant;
+        }
+        // Recherche du prochain noeud à traiter (le plus petit parmi les état == 1)
+        int index_min;
+        int val_min = 222222222222;
+        for (int i = 0; i < nombre_aeroports; i++) {
+            if (noeuds[i].etat == 1 && noeuds[i].date_arrivee < val_min) {
+                index_min = i;
+                val_min = noeuds[i].date_arrivee;
+            }
+        }
+        Noeud* noeud_temp = noeud_actuel;
+        noeud_actuel = &noeuds[index_min];
+        noeud_actuel->noeud_precedent = noeud_temp;
+    }
+
+    printf("Departure : %s | Arrival : %s | Date : %lld\n", aeroport_depart_fs, aeroport_arrivee_fs, destination->date_arrivee);
+    return destination->date_arrivee;
+}
+
+
+// MAIN
 int main(int argc, char const *argv[])
 {
+    printf("Bonjour, nous sommes le 04/02/2016. Il est 13h12.\n");
     printf("Chargement des données :\n");
     // Chargement des données
     Liste_villes* liste_villes = lister_aeroports();
@@ -1127,26 +1204,10 @@ int main(int argc, char const *argv[])
                 calculer_vol = 1;
             }
         } if (calculer_vol == 1) {
-            // Initialisation des données nécessaires à Dijkstra
-            int nombre_aeroports = compter_nombre_aeroports(*liste_villes);
-            Noeud* noeuds = (Noeud*)malloc(nombre_aeroports*sizeof(Noeud));
-            int numero_aeroport = 0;
-            Ville* ville_curseur = liste_villes->tete_villes;
-            Aero* aero_curseur;
-            while (ville_curseur != NULL) {
-                aero_curseur = ville_curseur->liste_aeroports->tete_aeros;
-                while (aero_curseur != NULL) {
-                    noeuds[numero_aeroport].noeud_precedent = NULL;
-                    noeuds[numero_aeroport].aeroport = aero_curseur;
-                    noeuds[numero_aeroport].etat = 0;
-                    noeuds[numero_aeroport].date_arrivee = 0;
-                    numero_aeroport++;
-                    aero_curseur = aero_curseur->aero_suivant;
-                }
-                ville_curseur = ville_curseur->ville_suivante;
-            }
-            Noeud* noeud_actuel = malloc(sizeof(Noeud));
-            
+            // Meilleur aéroport de départ et d'arrivée
+            Aero* meilleur_aeroport_depart;
+            Aero* meilleur_aeroport_arrivee;
+
             // Enregistre les villes de départ et d'arrivée
             Ville* ville_depart = trouver_ville(*liste_villes, num_ville_depart);
             Ville* ville_arrivee = trouver_ville(*liste_villes, num_ville_arrivee);
@@ -1173,9 +1234,17 @@ int main(int argc, char const *argv[])
                 for (int i = 0; i < nombre_aeroport_depart; i++) {
                     waitpid(pids_depart[i], &date_arrivee_chemin_x, 0); // RECEPTION 2/2 - Plus court chemin par aéroport de départ
                     dates_arrivee_chemin_x[i] = WEXITSTATUS(date_arrivee_chemin_x);
-                    // printf("RECEPTION 2/2 : %d -> %d\n", i, dates_arrivee_chemin_x[i]);
                 }
+                // On connait désormais le meilleur aéroport de départ
+                meilleur_aeroport_depart = trouver_aeroport(*ville_depart, index_plus_petite_valeur(dates_arrivee_chemin_x, nombre_aeroport_depart));
                 printf("Il vaut mieux partir de l'aéroport : %s\n", trouver_aeroport(*ville_depart, index_plus_petite_valeur(dates_arrivee_chemin_x, nombre_aeroport_depart))->nom_aeroport);
+                // TODO : Recherche du meilleur aéroport d'arrivée
+
+                // TODO : Dijkstra final pour connaitre le meilleur itinéraire
+
+                // FIN DU PROGRAMME
+                printf("Merci d'avoir utilisé nos services, à bientôt !\n");
+                choix_utilisateur = 0;
             } else { // Chaque fils
 //------------------------------------------------------------------------------------------------------
                 __pid_t* pids_arrivee = malloc(nombre_aeroport_arrivee*sizeof(__pid_t));
@@ -1193,13 +1262,10 @@ int main(int argc, char const *argv[])
                     for (int i = 0; i < nombre_aeroport_arrivee; i++) {
                         waitpid(pids_arrivee[i], &date_arrivee_chemin_y, 0); // RECEPTION 1/2 - Meilleur chemin pour chaque aéroport d'arrivée depuis l'aéroport actuel
                         dates_arrivee_chemin_y[i] = WEXITSTATUS(date_arrivee_chemin_y);
-                        // printf("RECEPTION 1/2 : %d -> %d\n", i, dates_arrivee_chemin_y[i]);
                     }
-                    // printf("Meilleur aéroport d'arrivée : %s\n", trouver_aeroport(*ville_arrivee, index_plus_petite_valeur(dates_arrivee_chemin_y, nombre_aeroport_arrivee))->nom_aeroport);
                     exit(plus_petite_valeur(dates_arrivee_chemin_y, nombre_aeroport_arrivee)); // RETOUR : 2/2 - Le chemin le plus court parmis ceux partant de cet aéroport
                 } else { // chaque fils -> Dijkstra s'effectue ici
-
-                    exit(); // RETOUR : 1/2 - Plus courte date de chaque chemin arrivant à cet aéroport
+                    exit(dijkstra(liste_villes, aero_depart->code_fs, aero_arrivee->code_fs)); // RETOUR : 1/2 - Plus courte date de chaque chemin arrivant à cet aéroport
                 }
 //------------------------------------------------------------------------------------------------------
             }
